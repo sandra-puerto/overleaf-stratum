@@ -7,6 +7,7 @@
 # Function .......... Multi-user LaTeX collaboration platform.
 # Pattern ........... Stratum Consumer
 # Artifact .......... docker-compose.yml
+# Revision .......... 1.1.0
 # Status ............ Production
 #
 # ----------------------------------------------------------------------------
@@ -33,10 +34,10 @@
 # ----------------------------------------------------------------------------
 # 3. DEPLOYMENT ORDER & RUNBOOK
 # ----------------------------------------------------------------------------
-#   1. stratum/dmz/         -> provisions stratum_dmz network
-#   2. stratum/gateway/     -> deploys Cloudflare Tunnel & NPM
-#   3. stratum/database/    -> deploys MongoDB, Redis & L4 Boundary Proxy
-#   4. overleaf/ (this)     -> attaches to stratum_dmz and boots ShareLaTeX
+#   1. stratum/dmz/          -> provisions stratum_dmz network
+#   2. stratum/gateway/      -> deploys Cloudflare Tunnel & NPM
+#   3. stratum/database/     -> deploys MongoDB, Redis & L4 Boundary Proxy
+#   4. overleaf/ (this)      -> attaches to stratum_dmz and boots ShareLaTeX
 #
 # After deployment, configure a Proxy Host in Nginx Proxy Manager (NPM):
 #   Domain Names ....... latex.yourdomain.com
@@ -61,8 +62,6 @@ services:
 
   sharelatex:
     <<: *defaults
-    # WARNING: Do NOT use :latest! Version 6.3.0+ contains a Node 22 bug with mongodb-legacy
-    # that causes crash loops. Pinning to 6.2.2 is mandatory until upstream fixes it.
     image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:6.2.2}
     container_name: ${OVERLEAF_CONTAINER_NAME:-overleaf-${TENANT_ID:-default}-app}
     init: true
@@ -74,9 +73,9 @@ services:
       OVERLEAF_APP_NAME: ${OVERLEAF_APP_NAME:-"Overleaf LaTeX"}
       OVERLEAF_SITE_URL: ${OVERLEAF_SITE_URL:-https://latex.example.com}
       OVERLEAF_NAV_TITLE: ${OVERLEAF_NAV_TITLE:-"LaTeX Studio"}
-      
+
       # --- Transversal Persistence (Stratum Boundary Proxy) ---
-      OVERLEAF_MONGO_URL: mongodb://${MONGO_APP_USER:-${TENANT_ID:-default}_overleaf_app}:${MONGO_APP_PASSWORD}@${STRATUM_DB_HOST:-stratum-database-nginx}:27017/${MONGO_DB_NAME:-${TENANT_ID:-default}_overleaf}?authSource=${MONGO_AUTH_SOURCE:-admin}${MONGO_EXTRA_PARAMS:-&replicaSet=rs0&directConnection=true}
+      OVERLEAF_MONGO_URL: mongodb://${MONGO_APP_USER:-${TENANT_ID:-default}_overleaf_app}:${MONGO_APP_PASSWORD}@${STRATUM_DB_HOST:-stratum-database-nginx}:27017/${MONGO_DB_NAME:-${TENANT_ID:-default}_overleaf}?authSource=${MONGO_AUTH_SOURCE:-admin}${MONGO_EXTRA_PARAMS:-}
       OVERLEAF_REDIS_HOST: ${STRATUM_DB_HOST:-stratum-database-nginx}
       OVERLEAF_REDIS_PORT: ${STRATUM_REDIS_PORT:-6379}
       OVERLEAF_REDIS_PASS: ${REDIS_PASSWORD}
@@ -100,7 +99,7 @@ services:
       - sharelatex_data:/var/lib/overleaf
 
     tmpfs:
-      - /tmp:size=384m,mode=1777
+      - /tmp:size=512m,mode=1777
       - /var/run:size=16m,mode=0755
 
     networks:
@@ -121,11 +120,11 @@ services:
 
     ulimits:
       nofile:
+        soft: 65536
+        hard: 65536
+      nproc:
         soft: 2048
         hard: 4096
-      nproc:
-        soft: 150
-        hard: 300
 
     stop_signal: SIGTERM
     stop_grace_period: 30s
@@ -133,11 +132,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "${CPU_LIMIT:-1.5}"
-          memory: "${MEM_LIMIT:-2.5G}"
-          pids: 150
+          cpus: "${CPU_LIMIT:-2.0}"
+          memory: "${MEM_LIMIT:-3.0G}"
+          pids: 400
         reservations:
-          memory: "${MEM_RESERVATION:-768M}"
+          memory: "${MEM_RESERVATION:-1.0G}"
 
     labels:
       org.opencontainers.image.authors: "Sandra Gabriela Puerto Torres <contacto@sandrapuerto.com>"
@@ -147,7 +146,7 @@ services:
       com.stratum.project: "overleaf-${TENANT_ID:-default}"
       com.stratum.pattern: "stratum-consumer"
       com.stratum.role: "latex-platform"
-      com.stratum.revision: "1.0.0"
+      com.stratum.revision: "1.1.0"
 
     healthcheck:
       test: ["CMD-SHELL", "curl -f -s http://127.0.0.1:80/health_check || curl -f -s http://127.0.0.1:80/ || exit 1"]
