@@ -1,11 +1,32 @@
+# ==============================================================================
+# Git Ignore Rules — Overleaf Stratum Consumer
+# ==============================================================================
+
+# Environment and secrets
+.env
+.env.local
+*.key
+*.pem
+*.secret
+
+# Docker & local volume data
+.docker/
+data/
+sharelatex_data/
+
+# OS and Editor artifacts
 .DS_Store
-.idea
-*.log
-tmp/
+Thumbs.db
 *.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
 
-config/**/*
-!config/.gitkeep
-
-data/**/*
-!data/.gitkeep
+# Build artifacts & logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
