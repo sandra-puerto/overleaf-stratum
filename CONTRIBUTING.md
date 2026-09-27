@@ -38,7 +38,6 @@ This project strictly adheres to the **Stratum Consumer Architecture Pattern**:
 ## 3. Code & Configuration Standards
 
 * **Docker Compose:** Keep configuration clean, DRY, and well-commented. Preserve default health checks and labels.
-* **Dockerfile:** Combine package installations into single cached layers where appropriate, cleaning `/var/lib/apt/lists/*` to minimize final image footprint.
 * **Environment Variables:** Document any new environment variable in `.env.example` with safe defaults and clear annotations.
 
 ---

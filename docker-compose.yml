@@ -40,7 +40,7 @@
 #
 # After deployment, configure a Proxy Host in Nginx Proxy Manager (NPM):
 #   Domain Names ....... latex.yourdomain.com
-#   Forward Hostname ... overleaf-sharelatex
+#   Forward Hostname ... overleaf-<tenant>-app (e.g. overleaf-sgpt-app)
 #   Forward Port ....... 80
 #   Scheme ............. http
 #   Websockets ......... Enabled
@@ -55,29 +55,28 @@ x-defaults: &defaults
       max-file: "3"
       compress: "true"
 
-name: overleaf
+name: ${COMPOSE_PROJECT_NAME:-overleaf-${TENANT_ID:-default}}
 
 services:
 
   sharelatex:
     <<: *defaults
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: overleaf-ce:latest
-    container_name: overleaf-sharelatex
+    # WARNING: Do NOT use :latest! Version 6.3.0+ contains a Node 22 bug with mongodb-legacy
+    # that causes crash loops. Pinning to 6.2.2 is mandatory until upstream fixes it.
+    image: ${OVERLEAF_IMAGE:-sharelatex/sharelatex:6.2.2}
+    container_name: ${OVERLEAF_CONTAINER_NAME:-overleaf-${TENANT_ID:-default}-app}
     init: true
 
     environment:
       TZ: ${TZ:-America/Bogota}
 
       # --- Application Identity & Public Endpoints ---
-      OVERLEAF_APP_NAME: ${OVERLEAF_APP_NAME:-"Overleaf Community Edition"}
+      OVERLEAF_APP_NAME: ${OVERLEAF_APP_NAME:-"Overleaf LaTeX"}
       OVERLEAF_SITE_URL: ${OVERLEAF_SITE_URL:-https://latex.example.com}
       OVERLEAF_NAV_TITLE: ${OVERLEAF_NAV_TITLE:-"LaTeX Studio"}
       
       # --- Transversal Persistence (Stratum Boundary Proxy) ---
-      OVERLEAF_MONGO_URL: mongodb://${MONGO_APP_USER:-overleaf_app}:${MONGO_APP_PASSWORD}@${STRATUM_DB_HOST:-stratum-database-nginx}:27017/${MONGO_DB_NAME:-sharelatex}?authSource=${MONGO_AUTH_SOURCE:-admin}${MONGO_EXTRA_PARAMS:-}
+      OVERLEAF_MONGO_URL: mongodb://${MONGO_APP_USER:-${TENANT_ID:-default}_overleaf_app}:${MONGO_APP_PASSWORD}@${STRATUM_DB_HOST:-stratum-database-nginx}:27017/${MONGO_DB_NAME:-${TENANT_ID:-default}_overleaf}?authSource=${MONGO_AUTH_SOURCE:-admin}${MONGO_EXTRA_PARAMS:-&replicaSet=rs0&directConnection=true}
       OVERLEAF_REDIS_HOST: ${STRATUM_DB_HOST:-stratum-database-nginx}
       OVERLEAF_REDIS_PORT: ${STRATUM_REDIS_PORT:-6379}
       OVERLEAF_REDIS_PASS: ${REDIS_PASSWORD}
@@ -95,6 +94,7 @@ services:
       EMAIL_CONFIRMATION_DISABLED: ${EMAIL_CONFIRMATION_DISABLED:-"true"}
       ENABLE_CONVERSIONS: ${ENABLE_CONVERSIONS:-"true"}
       TEXLIVE_PATH: /usr/local/texlive
+      ALLOW_MONGO_ADMIN_CHECK_FAILURES: "true"
 
     volumes:
       - sharelatex_data:/var/lib/overleaf
@@ -119,10 +119,6 @@ services:
       - SETUID
       - NET_BIND_SERVICE
 
-    pids_limit: 150
-    mem_limit: ${MEM_LIMIT:-2.5G}
-    memswap_limit: ${MEM_LIMIT:-2.5G}
-
     ulimits:
       nofile:
         soft: 2048
@@ -139,6 +135,7 @@ services:
         limits:
           cpus: "${CPU_LIMIT:-1.5}"
           memory: "${MEM_LIMIT:-2.5G}"
+          pids: 150
         reservations:
           memory: "${MEM_RESERVATION:-768M}"
 
@@ -146,7 +143,8 @@ services:
       org.opencontainers.image.authors: "Sandra Gabriela Puerto Torres <contacto@sandrapuerto.com>"
       com.sandrapuerto.architecture: "Stratum-Core"
       com.sandrapuerto.website: "https://sandrapuerto.com"
-      com.stratum.project: "overleaf"
+      com.stratum.tenant: "${TENANT_ID:-default}"
+      com.stratum.project: "overleaf-${TENANT_ID:-default}"
       com.stratum.pattern: "stratum-consumer"
       com.stratum.role: "latex-platform"
       com.stratum.revision: "1.0.0"
@@ -161,7 +159,7 @@ services:
 
 volumes:
   sharelatex_data:
-    name: overleaf_sharelatex_data
+    name: ${OVERLEAF_VOLUME_NAME:-overleaf_${TENANT_ID:-default}_data}
 
 networks:
   stratum_dmz:

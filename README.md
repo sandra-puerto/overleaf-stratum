@@ -26,6 +26,7 @@ Standard self-hosted Overleaf deployments suffer from common structural bottlene
 * **100% Ingress Cloaking:** Zero open host ports. Ingress traffic enters strictly through outbound Cloudflare Zero-Trust Tunnels and is routed internally by Nginx Proxy Manager on the `stratum_dmz` network.
 * **Full TeX Live Environment:** Pre-packaged with `scheme-full` and essential typography (`Noto`, `Liberation`, `DejaVu`), eliminating runtime package download delays.
 * **Strict Container Hardening:** Enforces `no-new-privileges: true`, structured log rotation, CPU/RAM quotas, and isolated network boundaries.
+* **Architecture Pinning:** Hardcoded to Overleaf `6.2.2` to bypass critical Node 22 + MongoDB Legacy Driver upstream crashes in `6.3.0+`.
 
 ---
 
@@ -125,8 +126,7 @@ sequenceDiagram
 overleaf/
 ├── .env.example          # Environment template with generic placeholders
 ├── .gitignore            # Git exclusion rules (secrets, volumes, caches)
-├── docker-compose.yml    # Hardened Overleaf consumer deployment
-├── Dockerfile            # Optimized TeX Live scheme-full + system fonts image
+├── docker-compose.yml    # Hardened Overleaf consumer deployment (official image)
 ├── LICENSE               # MIT License with Security Disclosure Clause
 ├── README.md             # Master Architecture & Technical Specification
 ├── SECURITY.md           # Responsible Vulnerability Disclosure Protocol
@@ -169,10 +169,12 @@ Ensure the Overleaf database and user are initialized in Stratum's MongoDB:
 use sharelatex;
 db.createUser({
   user: "overleaf_app",
-  pwd: "your_strong_password_here",
+  pwd: "your_alphanumeric_url_safe_password",
   roles: [ { role: "readWrite", db: "sharelatex" } ]
 });
 ```
+
+*Note: The MongoDB backend MUST be configured as a Replica Set (`rs0`), even if it is a single-node cluster, because modern Overleaf heavily utilizes MongoDB multi-document transactions.*
 
 ### 6.3 Deployment Commands
 
@@ -227,9 +229,9 @@ Follow the generated URL in your browser to finalize password setup.
 | `STRATUM_DMZ_NETWORK` | `stratum_dmz` | Name of the shared external DMZ Docker network. |
 | `STRATUM_DB_HOST` | `stratum-database-nginx` | Hostname of the Stratum L4 boundary proxy on `stratum_dmz`. |
 | `MONGO_APP_USER` | `overleaf_app` | MongoDB user assigned to the `sharelatex` database. |
-| `MONGO_APP_PASSWORD` | *(Required)* | MongoDB password for the application user. |
+| `MONGO_APP_PASSWORD` | *(Required)* | MongoDB password (Must be URL-safe / Alphanumeric to prevent connection parser crashes). |
 | `MONGO_DB_NAME` | `sharelatex` | Primary MongoDB database name. |
-| `MONGO_EXTRA_PARAMS` | *(Optional)* | Query parameters for MongoDB connection string (e.g. `&replicaSet=rs0`). |
+| `MONGO_EXTRA_PARAMS` | `&replicaSet=rs0&directConnection=true` | Required parameters for single-node replica set behind Stratum Proxy. |
 | `REDIS_PASSWORD` | *(Required)* | Redis authentication password configured in Stratum. |
 | `OVERLEAF_SITE_URL` | `https://latex.example.com` | Canonical public HTTPS URL for the platform. |
 | `OVERLEAF_SESSION_SECRET` | *(Required)* | 32-byte Base64 secret key for encrypting user sessions across restarts. |
