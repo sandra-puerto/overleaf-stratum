@@ -143,6 +143,9 @@ services:
           memory: "${MEM_RESERVATION:-768M}"
 
     labels:
+      org.opencontainers.image.authors: "Sandra Gabriela Puerto Torres <contacto@sandrapuerto.com>"
+      com.sandrapuerto.architecture: "Stratum-Core"
+      com.sandrapuerto.website: "https://sandrapuerto.com"
       com.stratum.project: "overleaf"
       com.stratum.pattern: "stratum-consumer"
       com.stratum.role: "latex-platform"
